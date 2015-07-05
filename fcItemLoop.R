@@ -8,16 +8,26 @@ library(forecast)
 #fcast <- matrix(NA,nrow=h,ncol=ns)
 #for(i in 1:ns)
 #  fcast[,i] <- forecast(retail[,i],h=h)$mean
-
 #write(t(fcast),file="retailfcasts.csv",sep=",",ncol=ncol(fcast))
-
 ##wtc <- function(x) {write.table(x, "clipboard", sep="\t", row.names=FALSE)}
+fcSummary <- function(x) {
+     z <- lapply(x, function(x) {unlist(x[11:13])})
+     result <- do.call(rbind,z)
+     result
+}
 
 
 ##Take DataFrame from LAPPLY and generate parent TS object
+fcCompare <- function(x,last_actual,lookback_years) {
+     lapply(x,fcMulti,last_actual,lookback_years)
+}
 
 fcMulti <- function(x,last_actual,lookback_years) {
-     fcTStoYR(fcItemToTS(x),last_actual,lookback_years)  
+     x.name <- x[1,1]
+     ##print(x.name)
+     x <- tryCatch(fcTStoYR(fcItemToTS(x),last_actual,lookback_years) , error=function(e) NULL)
+     
+     c(item=x.name,x)
 }
 
 fcItemToTS <- function(x) {
@@ -44,6 +54,9 @@ fcTStoYR <- function(x,last_actual,lookback_years) {
      if(start.win<xstart){ return("data starts too late")}
      
      ##use window to subset
-     window(x,start=start.win,end=end.win)
+     fcst <- forecast(window(x,start=start.win,end=end.win),8)
+     actual <- window(x,start=c(2014,5),end=c(2014,12))
+     c(fcst,forecasted_ROY=round(sum(fcst$mean),0),actual_ROY=round(sum(actual),0),simple_variance=round(sum(fcst$mean)/sum(actual),3))
 }
+
 
