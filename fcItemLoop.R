@@ -59,4 +59,11 @@ fcTStoYR <- function(x,last_actual,lookback_years) {
      c(fcst,forecasted_ROY=round(sum(fcst$mean),0),actual_ROY=round(sum(actual),0),simple_variance=round(sum(fcst$mean)/sum(actual),3))
 }
 
+asNumeric <- function(x) as.numeric(as.character(x))
+factorsNumeric <- function(d) modifyList(d, lapply(d[, sapply(d, is.character)], asNumeric))
 
+fcRecastFC <- function(fcObject) {
+     st <- start(fcObject$x)
+     frq <- frequency(fcObject$x)
+     t <- ts(c(fcObject$x,fcObject$mean),start=st,frequency=frq)
+}
