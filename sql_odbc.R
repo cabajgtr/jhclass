@@ -1,13 +1,14 @@
 
 require(RODBC)
-odbcConnect()
+--odbcConnect()
 conn <- odbcDriverConnect('driver={SQL Server};server=NAEMSQL02\\SPREPORTING;database=SP_REPORTING;trusted_connection=true')
-sql <- "SELECT SEGMENT3,POS_YEAR,POS_MTH_NBR,SUM(POS_UNITS) as units
+sql <- "SELECT POS_YEAR,POS_MTH_NBR,SUM(POS_UNITS) as units
   FROM R_POS_VIEW_MONTHLY
-  WHERE SEGMENT1 = 'LEARNING TOYS'
-  GROUP BY POS_YEAR, POS_MTH_NBR,SEGMENT1,SEGMENT2,SEGMENT3
+  WHERE SEGMENT1 = 'MULTIMEDIA LEARNING PLATFORMS' AND SEGMENT2 = 'PLATFORM'
+  GROUP BY POS_YEAR, POS_MTH_NBR,SEGMENT1,SEGMENT2
   ORDER BY POS_YEAR, POS_MTH_NBR"
 sql <- strwrap(sql, width=10000, simplify=TRUE)
-TOYS <- sqlQuery(conn, sql)
-TOYS.ALL <- split(TOYS,TOYS$SEGMENT3)
-lapply(TOYS.ALL,HoltWinters)
+MMLSUM <- sqlQuery(conn, sql)
+odbcClose(conn)
+
+MML.HW <- split(TOYS,TOYS$SEGMENT3)

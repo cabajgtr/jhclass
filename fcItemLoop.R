@@ -66,4 +66,5 @@ fcRecastFC <- function(fcObject) {
      st <- start(fcObject$x)
      frq <- frequency(fcObject$x)
      t <- ts(c(fcObject$x,fcObject$mean),start=st,frequency=frq)
+     t
 }
