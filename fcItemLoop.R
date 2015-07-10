@@ -68,3 +68,12 @@ fcRecastFC <- function(fcObject) {
      t <- ts(c(fcObject$x,fcObject$mean),start=st,frequency=frq)
      t
 }
+
+fcItemAccuracyOverTime <- function(xts,YEAR) {
+     fc <- as.list(NULL)
+     for(mo in 0:11) {
+     t <- window(xts,end=c(YEAR,mo))
+     fc <- c(fc,forecast(t,11-i))
+     }
+     fc
+}
