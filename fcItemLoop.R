@@ -69,11 +69,43 @@ fcRecastFC <- function(fcObject) {
      t
 }
 
-fcItemAccuracyOverTime <- function(xts,YEAR) {
+fcItemAccuracyOverTime <- function(xts,YEAR,itemName,model) {
      fc <- as.list(NULL)
-     for(mo in 0:11) {
-     t <- window(xts,end=c(YEAR,mo))
-     fc <- c(fc,forecast(t,11-i))
+     for(mo in 0:10) {
+          t <- window(xts,end=c(YEAR,mo))
+          a <- window(xts,start=c(YEAR,1),end=c(YEAR,12))
+          actualized <- if(mo>0) {sum(window(t,start=c(YEAR,1)))} else 0
+          f <- forecast(t,h=12-mo,model=model)
+          ##get total for Act and FCST for accuracy comparison
+          a.ttl <- sum(a)
+          f.ttl <- sum(f$mean)+actualized
+          f <- c(f,accuracy=list(cbind(item=as.character(itemName),year=YEAR,month=mo,accuracy(f$mean,a),act=a.ttl,proj=f.ttl,netAcc=round((1-abs(f.ttl-a.ttl)/a.ttl),3)*100,model=f$method))) 
+          fc <- c(fc,list(f))
      }
-     fc
+     #fc
+     ##for accuracy summary:
+     x <- data.table(do.call("rbind",lapply(fc,function(x) x$accuracy)))
+     #row.names(x) = c(paste(itemName,"DEC"),paste(itemName,"JAN"),paste(itemName,"FEB"),paste(itemName,"MAR"),paste(itemName,"APR"),paste(itemName,"MAY"),paste(itemName,"JUN"),paste(itemName,"JUL"),paste(itemName,"AUG"),paste(itemName,"SEP"),paste(itemName,"OCT"))
+     x
+}
+
+
+fcAccuracyOverTimeMulti <- function(x,YEAR,model) {
+     x.name <- x[1,1]
+     fx <- tryCatch((window(fcItemToTS(x),end=c(YEAR,12))), error=function(e) NULL)
+     
+     if(length(fx)>36) {
+          fc <- tryCatch(fcItemAccuracyOverTime(fx,YEAR,x.name,model), error=function(e) NULL)
+print(paste(x.name,length(fx)))
+          if(!is.null(fc)) fco$appendAcc(fc)
+print("done append")
+     }
+     else return()  #(list(x.name,": not enough history"))
+}
+
+fcRunAccuracy <- function(x,YEAR,model) {
+     fco <- fcStore()
+     lapply(x,fcAccuracyOverTimeMulti,YEAR,model)
+##     x <- data.table(do.call("rbind",unlist(x)))
+     fco$getAcc()
 }
