@@ -8,7 +8,8 @@ require(RODBC)
 conn <- odbcDriverConnect('driver={SQL Server};server=NAEMSQL02\\SPREPORTING;database=SP_REPORTING;trusted_connection=true')
 sql <- "SELECT SEGMENT4,GIN, TT_CUSTOMER, POS_YEAR, POS_MTH_NBR, POS_WK_NBR, SUM(POS_UNITS) as units
      FROM R_POS_VIEW_MONTHLY
-WHERE SEGMENT1 = 'TOYS'
+WHERE SEGMENT2 NOT IN  ('SPECIALS','LEGACY')
+AND SEGMENT2 NOT LIKE  ('OTHER%')
 AND POS_YEAR > 2009
 AND POS_WK_NBR < 53
 AND POS_UNITS not between -5 and 5
@@ -33,6 +34,8 @@ TOYS.SEASON <- TOYS.SEASON[,.(units=sum(units),MoCt=.N),keyby=.(SEGMENT4,TT_CUST
      #SPRING & incomplete (7 months)
      TOYS.SEASON[SPRING==FALSE & MoCt==5,full_season:=TRUE]
      #FALL & incomplete (5 months)
+     TOYS.SEASON[,season_index:=0]
+     TOYS.SEASON[SPRING==FALSE,season_index:=1]
 
 #Consolidate Seasonal "full_season" to get "full_calyear"  Will join with TOYS.SEASONAL.MULTIPLE BELOW:
 TOYS.CY_COMPLETE <- TOYS.SEASON[,.(full_cy=as.logical(min(full_season)),ssn_ct=.N),keyby=.(SEGMENT4,TT_CUSTOMER,GIN,POS_YEAR)]
@@ -79,6 +82,8 @@ TOYS.SEASON.MULTIPLE <- dcast.data.table(
      #SPRING & incomplete (7 months)
      TOYS.SEASON[SPRING==FALSE & MoCt==5,full_season:=TRUE]
      #FALL & incomplete (5 months)
+     TOYS.SEASON[,season_index:=0]
+     TOYS.SEASON[SPRING==FALSE,season_index:=1]
      
      #Consolidate Seasonal "full_season" to get "full_calyear"  Will join with TOYS.SEASONAL.MULTIPLE BELOW:
      TOYS.CY_COMPLETE <- TOYS.SEASON[,.(full_cy=as.logical(min(full_season)),ssn_ct=.N),keyby=.(SEGMENT4,TT_CUSTOMER,POS_YEAR)]
@@ -143,18 +148,27 @@ g +coord_flip() #flip horizontal for easier reading
 ###########
 ###########
      
-     
+##DCAST BY YEAR, TO HAVE SUMMARY BY ITEM for CLUSTERING     
      TOYS.SSN.YRCLUSTER <- dcast.data.table(
           TOYS.SEASON.MULTIPLE[full_cy==TRUE]
           ,TT_CUSTOMER + SEGMENT4 ~ POS_YEAR
           ,value.var = "SSN_MULTIPLE")     
-     
 
-p <- ts(TOYS[SEGMENT4 == 'PICNIC BASKET' & TT_CUSTOMER == 'WMT'
-             ,.(units = sum(units))
-             ,keyby=.(POS_YEAR,POS_MTH_NBR)]$units)
-        ,start = c(2010,11),frequency = 12)
-plot(stl(p,"per"))
+
+
+####Weekly Seaonality Prep
+##Eliminating GIN from the get-go
+TOYS.WEEKLY <- TOYS[,.(units=sum(units)),keyby=.(POS_YEAR,TT_CUSTOMER,SEGMENT4,POS_MTH_NBR,POS_WK_NBR,SPRING=POS_MTH_NBR<8)]
+#create seasonality index for KEY
+TOYS.WEEKLY[,season_index:=0]
+TOYS.WEEKLY[SPRING==FALSE,season_index:=1]
+
+#JOIN
+setkey(TOYS.WEEKLY,POS_YEAR,TT_CUSTOMER,SEGMENT4,season_index)
+setkey(TOYS.SEASON,POS_YEAR,TT_CUSTOMER,SEGMENT4,season_index)
+TOYS.SEASON[TOYS.WEEKLY]
+
+
 
 
 #> # April is missing
