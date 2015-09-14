@@ -109,3 +109,12 @@ fcRunAccuracy <- function(x,YEAR,model) {
 ##     x <- data.table(do.call("rbind",unlist(x)))
      fco$getAcc()
 }
+
+GetSeasonality <- function(x,YEAR) {
+     t <- fcItemToTS(x)
+     SPR <- window(t,start = c(YEAR,1), end=c(YEAR,7))
+     FALL <- window(t,start = c(YEAR,8), end=c(YEAR,12))
+     SEASONALITY <- sum(FALL)/sum(SPR)
+     data.frame(SPR=as.integer(round(sum(SPR),0)),FALL=as.integer(round(sum(FALL),0)),SEASONALITY=round(SEASONALITY,3))
+}
+     
