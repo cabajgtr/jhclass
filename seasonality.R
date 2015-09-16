@@ -2,7 +2,7 @@
 cpb <- function(x) {
      write.table(x, "clipboard", sep="\t", row.names=FALSE)
 }
-
+ 
 require(RODBC)
 
 conn <- odbcDriverConnect('driver={SQL Server};server=NAEMSQL02\\SPREPORTING;database=SP_REPORTING;trusted_connection=true')

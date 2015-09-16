@@ -9,7 +9,7 @@ require(data.table)
 require(zoo)
 
 forecast_table <- function(x) {
-
+ 
      ##INPUTS:
      freq <- 12
      tend <- c(2014,3) #CUT OFF ACTUALS for simulation
