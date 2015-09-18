@@ -11,59 +11,70 @@ require(zoo)
 forecast_table <- function(x) {
  
      ##INPUTS:
-     freq <- 12
-     tend <- c(2014,3) #CUT OFF ACTUALS for simulation
-     fend <- c(2016,3) #FORECAST THROUGH this month
+     freq <- 52
+     tend <- c(2014,freq/4) #CUT OFF ACTUALS for simulation
+     fend <- c(2016,freq/4) #FORECAST THROUGH this month
      
      
-     tend.dt <- as.Date.yearmon(yearmon(tend[1]+(tend[2]-1)/12))
-     fend.dt <- as.Date.yearmon(yearmon(fend[1]+(fend[2]-1)/12))
-     
+     #tend.dt <- as.Date.yearmon(yearmon(tend[1]+(tend[2]-1)/freq))
+     tend.dt <- tend[1]+(tend[2]-1)/freq
+     #fend.dt <- as.Date.yearmon(yearmon(fend[1]+(fend[2]-1)/freq))
+     fend.dt <- fend[1]+(fend[2]-1)/freq
+
      item <- x
      
      
-     tstart <- item[1,c(POS_YEAR,POS_MTH_NBR)] #Note exception of .() or list(), must output vector for ts()
-     tstart.dt <- as.Date.yearmon(yearmon(tstart[1]+(tstart[2]-1)/12))
-     tactuals_end <- item[.N,c(POS_YEAR,POS_MTH_NBR)] #Note exception of .() or list(), must output vector for ts()
-     tactuals_end.dt <- as.Date.yearmon(yearmon(tactuals_end[1]+(tactuals_end[2]-1)/12))
+     tstart <- item[1,c(POS_YEAR,PERIOD)] #Note exception of .() or list(), must output vector for ts()
+     #tstart.dt <- as.Date.yearmon(yearmon(tstart[1]+(tstart[2]-1)/freq))
+     tstart.dt <- tstart[1]+(tstart[2]-1)/freq
+     
+     tactuals_end <- item[.N,c(POS_YEAR,PERIOD)] #Note exception of .() or list(), must output vector for ts()
+     #tactuals_end.dt <- as.Date.yearmon(yearmon(tactuals_end[1]+(tactuals_end[2]-1)/freq))
+     tactuals_end.dt <- tactuals_end[1]+(tactuals_end[2]-1)/freq
      #Check for critical length of history
           #Check for 24 months of history
-          if(as.yearmon(tend.dt) - as.yearmon(tstart.dt) < 1) {
+          if(tend.dt - tstart.dt < 1) {
                #print("not enough history")
-               return(data.table(POS_MTH_NBR=0,SSN_PROFILE=0,POS_YEAR=0L,UNITS_FC="",AF_FLAG="",FC_CONF_80="",MODEL="Not enough history"))
+               return(data.table(PERIOD=0,SSN_PROFILE=0,POS_YEAR=as.numeric(0),UNITS_FC="",AF_FLAG="",FC_CONF_80="",MODEL="Not enough history"))
                }
           if(tactuals_end.dt <=  tend.dt) {
                #print("item stopped selling")
-               return(data.table(POS_MTH_NBR=0,SSN_PROFILE=0,POS_YEAR=0L,UNITS_FC="",AF_FLAG="",FC_CONF_80="",MODEL="item stopped selling"))
+               return(data.table(PERIOD=0,SSN_PROFILE=0,POS_YEAR=as.numeric(0),UNITS_FC="",AF_FLAG="",FC_CONF_80="",MODEL="item stopped selling"))
           }
           
      
      ###CREATE TIMESERIES TO PROCESS
-     item.ts <- ts(item$units,start = tstart,frequency = 12,end=tend)
+     item.ts <- ts(item$units,start = tstart,frequency = freq,end=tend)
      #item.ts <<- item.ts
      ###Get simple seasonality
-     if(length(item.ts) > 23) {
+     if(length(item.ts) >= freq*2) {
                item.dc <- decompose(item.ts,"multiplicative")
           }
           else {
-               item.dc <- data.frame(figure = rep(0,12))    
+               item.dc <- data.frame(figure = as.numeric(rep(0,freq)))
      }
-     #map seasonality by month
-     sm <- (tstart[2]:(tstart[2]+11))
-     sm[sm>12] <- (sm[sm>12]-12)
+     #map seasonality by period
+     sm <- (tstart[2]:(tstart[2]+freq-1))
+     sm[sm>freq] <- (sm[sm>freq]-freq)
      SEASONALITY <- data.table(cbind(sm,item.dc$figure))
-     setnames(SEASONALITY,1:2,c("POS_MTH_NBR","SSN_PROFILE"))
-     setkey(SEASONALITY,POS_MTH_NBR)
+     setnames(SEASONALITY,1:2,c("PERIOD","SSN_PROFILE"))
+     setkey(SEASONALITY,PERIOD)
      
-
-     h <- tsdatediff(fend,tend)
+     h <- (fend.dt - tend.dt)*freq
+          #tsdatediff(fend,tend)
+     
+     #For weekly data, need TBATS conversion for forecast
+     #if(freq>12) {item.ts <- tbats(item.ts)}
+     item.ts <- tbats(item.ts)
      
      item.fc <- tryCatch(
           forecast(item.ts,h=h,model="ZZM")
           , error=function(e) NULL)
      
+     item.fc <<- item.fc
+     
      if(class(item.fc) != "forecast") {
-          return(data.table(POS_MTH_NBR=0,SSN_PROFILE=0,POS_YEAR=0L,UNITS_FC="",AF_FLAG="",FC_CONF_80="",MODEL="forecast error"))
+          return(data.table(PERIOD=0,SSN_PROFILE=0,POS_YEAR=0L,UNITS_FC="",AF_FLAG="",FC_CONF_80="",MODEL="forecast error"))
      }
      
      
@@ -73,19 +84,25 @@ forecast_table <- function(x) {
      ),use.names=FALSE, fill=FALSE)
      
      ##RESTORE YEAR / MONTH INDEX
-     ym <- seq(tstart.dt,fend.dt,by='month')
-     ym <- data.table(cbind(POS_YEAR=year(ym),POS_MTH_NBR=month(ym)))
+     ym <- seq(tstart.dt,fend.dt, by=1/freq) #by='month')
+     
+     ym <- data.table(cbind(
+               POS_YEAR=as.integer(ym)
+               ,PERIOD=((ym %% 1)*freq)+1L
+               ))
+     
      item.fc2 <- cbind(ym,item.fc2)
-     setkey(item.fc2,POS_MTH_NBR)
+     setkey(item.fc2,PERIOD)
+     item.fc2 <- SEASONALITY[item.fc2][order(POS_YEAR,PERIOD)]
      
-     item.fc2 <- SEASONALITY[item.fc2][order(POS_YEAR,POS_MTH_NBR)]
-     
-     
+     ##had issue with bad forecast returning non-integer year number to .SD
+     item.fc2[,POS_YEAR:=as.numeric(POS_YEAR)] 
      return(item.fc2)
+     
 }
 
 tsdatediff <- function(x,y) {
-     ((x[1]+((x[2]-1)/12)) - (y[1]+((y[2]-1)/12)))*12
+     ((x[1]+((x[2]-1)/freq)) - (y[1]+((y[2]-1)/freq)))*freq
 }
 
 acc <- function(x){ #expects data.frame or similar with col1 = Forecast, Col2 = Actuals

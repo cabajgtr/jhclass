@@ -5,24 +5,34 @@
 #Sample to Run By Customer and Segment4
 item <<- TOYS[#SEGMENT4=="MY PAL SCOUT" # & TT_CUSTOMER == "WMT"
      ,.(units = sum(units))
-     ,keyby=.(SEGMENT4,TT_CUSTOMER,POS_YEAR,POS_MTH_NBR)][order(SEGMENT4,TT_CUSTOMER,POS_YEAR,POS_MTH_NBR)]
+     ,keyby=.(SEGMENT4,TT_CUSTOMER,POS_YEAR,PERIOD=POS_MTH_NBR)][order(SEGMENT4,TT_CUSTOMER,POS_YEAR,POS_MTH_NBR)]
 item[,forecast_table(.SD),by=.(SEGMENT4,TT_CUSTOMER)]
 
-setkey(item,SEGMENT4,POS_YEAR,POS_MTH_NBR)
-setkey(item.test,SEGMENT4,POS_YEAR,POS_MTH_NBR)
+setkey(item,SEGMENT4,POS_YEAR,PERIOD)
+setkey(item.test,SEGMENT4,POS_YEAR,PERIOD)
 
 
 ##
 ##
 ##
+##BY MONTH BY ITEM (TOTAL US)
 item <- TOYS[POS_YEAR > 2011#SEGMENT4=="MY PAL SCOUT" # & TT_CUSTOMER == "WMT" ##May want to reduce items to forecast
              ,.(units = sum(units))
-             ,keyby=.(SEGMENT4,POS_YEAR,POS_MTH_NBR)][order(SEGMENT4,POS_YEAR,POS_MTH_NBR)]
+             ,keyby=.(SEGMENT4,POS_YEAR,PERIOD=POS_MTH_NBR)][order(SEGMENT4,POS_YEAR,PERIOD)]
+
+##BY WEEK BY ITEM (TOTAL US)
+item <- TOYS[POS_YEAR > 2011#SEGMENT4=="MY PAL SCOUT" # & TT_CUSTOMER == "WMT" ##May want to reduce items to forecast
+             ,.(units = sum(units))
+             ,keyby=.(SEGMENT4,POS_YEAR,PERIOD=POS_WK_NBR)][order(SEGMENT4,POS_YEAR,PERIOD)]
+
 item.test <- item[,forecast_table(.SD),by=.(SEGMENT4)]
 
 #JOIN and MERGE ORIGINAL ACTUALS FOR COMPARISON
-setkey(item,SEGMENT4,POS_YEAR,POS_MTH_NBR)
-setkey(item.test,SEGMENT4,POS_YEAR,POS_MTH_NBR)
+item[,POS_YEAR:=as.numeric(POS_YEAR)]
+item[,PERIOD:=as.numeric(PERIOD)]
+
+setkey(item,SEGMENT4,POS_YEAR,PERIOD)
+setkey(item.test,SEGMENT4,POS_YEAR,PERIOD)
 item.test <- item[item.test]
 
 #CREATE SECONDARY TABLE FOR ACCURACY RESULTS              
@@ -37,3 +47,8 @@ setkey(item.test,SEGMENT4,TT_CUSTOMER,POS_YEAR,POS_MTH_NBR)
 ##
 ##
 ##
+cpb(cbind(
+decompose(window(mmlhw.ts,start=c(2011,1)),"mult")$figure
+,decompose(window(mmlhw.ts,start=c(2012,1)),"mult")$figure
+,decompose(window(mmlhw.ts,start=c(2013,1)),"mult")$figure
+))
